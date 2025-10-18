@@ -83,22 +83,50 @@ def build_runner(
     return AgentRunner(agent=agent, telemetry=telemetry)
 
 
-def register_add_numbers_tool(mcp_client: MCPClient) -> None:
-    """Register a simple addition tool for demos."""
+def register_basic_math_tools(mcp_client: MCPClient) -> None:
+    """Register basic arithmetic tools (add, subtract, multiply, divide)."""
 
     def add(a: float, b: float) -> float:
         return a + b
 
-    mcp_client.register_tool(
-        name="add_numbers",
-        handler=add,
-        description="Add two numbers together.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "a": {"type": "number"},
-                "b": {"type": "number"},
+    def subtract(a: float, b: float) -> float:
+        return a - b
+
+    def multiply(a: float, b: float) -> float:
+        return a * b
+
+    def divide(a: float, b: float) -> float:
+        if b == 0:
+            raise ValueError("Division by zero is not allowed.")
+        return a / b
+
+    def register(name: str, handler: Callable[..., Any], description: str) -> None:
+        mcp_client.register_tool(
+            name=name,
+            handler=handler,
+            description=description,
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "a": {"type": "number"},
+                    "b": {"type": "number"},
+                },
+                "required": ["a", "b"],
             },
-            "required": ["a", "b"],
-        },
+        )
+
+    register("add_numbers", add, "Add two numbers together.")
+    register("subtract_numbers", subtract, "Subtract the second number from the first.")
+    register("multiply_numbers", multiply, "Multiply two numbers.")
+    register("divide_numbers", divide, "Divide the first number by the second.")
+
+
+def register_add_numbers_tool(mcp_client: MCPClient) -> None:
+    """
+    Backwards compatible helper that now registers the full set of basic math tools.
+    """
+
+    logger.warning(
+        "register_add_numbers_tool is deprecated; use register_basic_math_tools instead."
     )
+    register_basic_math_tools(mcp_client)

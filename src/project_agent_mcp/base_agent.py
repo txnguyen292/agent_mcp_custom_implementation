@@ -133,6 +133,7 @@ class BaseAgent:
         event_payload = {
             "iteration": iteration,
             "content": response.content,
+            "reasoning": response.reasoning,
             "tool_calls": [
                 {"name": call.name, "arguments": call.arguments, "call_id": call.call_id}
                 for call in response.tool_calls

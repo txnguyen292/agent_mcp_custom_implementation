@@ -114,49 +114,271 @@ class TelemetryManager:
     <meta charset="utf-8" />
     <title>Agent Run Dashboard</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 2rem; background: #f8f9fb; color: #1f2933; }}
-        h1 {{ margin-bottom: 0.5rem; }}
-        .meta {{ margin-bottom: 2rem; color: #52606d; }}
-        .card {{ background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 10px 30px rgba(15,23,42,0.08); }}
-        pre {{ background: #0f172a; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
-        th, td {{ padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left; }}
-        th {{ background: #f1f5f9; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; color: #475569; }}
-        .badge {{ display: inline-block; padding: 0.2rem 0.5rem; border-radius: 999px; background: #e0f2fe; color: #0284c7; font-size: 0.75rem; }}
+        :root {{
+            color-scheme: light dark;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            margin: 2rem;
+            background: #f8f9fb;
+            color: #1f2933;
+        }}
+        h1 {{
+            margin-bottom: 0.5rem;
+        }}
+        .meta {{
+            margin-bottom: 2rem;
+            color: #52606d;
+        }}
+        .grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }}
+        .card {{
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }}
+        .timeline {{
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }}
+        .timeline-entry {{
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }}
+        .timeline-entry.user {{ border-left: 4px solid #2563eb; }}
+        .timeline-entry.assistant {{ border-left: 4px solid #16a34a; }}
+        .timeline-entry.tool {{ border-left: 4px solid #d97706; }}
+        .timeline-entry.system {{ border-left: 4px solid #9333ea; }}
+        .timeline-entry h3 {{
+            margin: 0 0 0.35rem;
+            font-size: 1rem;
+        }}
+        .timeline-entry .timestamp {{
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }}
+        .timeline-entry pre {{
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 0.75rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }}
+        th, td {{
+            padding: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }}
+        th {{
+            background: #f1f5f9;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            color: #475569;
+        }}
+        pre {{
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+        }}
+        .tag {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .reasoning {{
+            background: rgba(59, 130, 246, 0.08);
+            border-left: 3px solid #3b82f6;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-top: 0.75rem;
+        }}
     </style>
 </head>
 <body>
     <h1>Agent Run Dashboard</h1>
     <p class="meta">Generated at {data['generated_at']}</p>
 
-    <div class="card">
-        <h2>Spans</h2>
-        <table>
-            <thead>
-                <tr><th>Name</th><th>Duration (ms)</th><th>Attributes</th></tr>
-            </thead>
-            <tbody id="span-table-body"></tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <h2>Events</h2>
-        <table>
-            <thead>
-                <tr><th>Timestamp</th><th>Type</th><th>Payload</th></tr>
-            </thead>
-            <tbody id="event-table-body"></tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <h2>Raw Data</h2>
-        <pre id="raw-data"></pre>
+    <div class="grid">
+        <div class="card">
+            <h2>Conversation Timeline</h2>
+            <div id="timeline" class="timeline"></div>
+        </div>
+        <div class="card">
+            <h2>Spans</h2>
+            <table>
+                <thead>
+                    <tr><th>Name</th><th>Duration (ms)</th><th>Attributes</th></tr>
+                </thead>
+                <tbody id="span-table-body"></tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h2>Event Log</h2>
+            <table>
+                <thead>
+                    <tr><th>Timestamp</th><th>Type</th><th>Payload</th></tr>
+                </thead>
+                <tbody id="event-table-body"></tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h2>Raw Data</h2>
+            <pre id="raw-data"></pre>
+        </div>
     </div>
 
     <script>
         const data = {serialized};
-        const formatJSON = (payload) => JSON.stringify(payload, null, 2);
+        const formatJSON = (payload) => {{
+            if (payload === undefined) return "undefined";
+            if (payload === null) return "null";
+            if (typeof payload === "string") return payload;
+            if (typeof payload === "number" || typeof payload === "boolean") return String(payload);
+            return JSON.stringify(payload, null, 2);
+        }};
+        const timelineContainer = document.getElementById("timeline");
+
+        const TIMELINE_TYPES = {{
+            user_message: {{ role: "user", title: "User Message" }},
+            llm_response: {{ role: "assistant", title: "LLM Response" }},
+            tool_call: {{ role: "tool", title: "Tool Call" }},
+            tool_result: {{ role: "tool", title: "Tool Result" }},
+            tool_error: {{ role: "tool", title: "Tool Error" }},
+            final_response: {{ role: "assistant", title: "Final Response" }},
+        }};
+
+        const renderTimelineEntry = (event) => {{
+            const info = TIMELINE_TYPES[event.type];
+            if (!info) return;
+
+            const entry = document.createElement("div");
+            entry.className = "timeline-entry " + info.role;
+
+            const header = document.createElement("h3");
+            header.textContent = info.title;
+            entry.appendChild(header);
+
+            const timestamp = document.createElement("span");
+            timestamp.className = "timestamp";
+            timestamp.textContent = event.timestamp;
+            entry.appendChild(timestamp);
+
+            const payload = event.payload || {{}};
+
+            if (event.type === "user_message") {{
+                entry.appendChild(createTextParagraph(payload.content ?? ""));
+            }} else if (event.type === "llm_response") {{
+                if (payload.content) {{
+                    entry.appendChild(createSection("Assistant Reply", payload.content));
+                }}
+                if (payload.reasoning) {{
+                    entry.appendChild(createReasoning(payload.reasoning));
+                }}
+                if (payload.tool_calls && payload.tool_calls.length) {{
+                    const list = document.createElement("ul");
+                    payload.tool_calls.forEach((call) => {{
+                        const item = document.createElement("li");
+                        item.innerHTML = "<strong>" + call.name + "</strong> " + formatJSON(call.arguments);
+                        list.appendChild(item);
+                    }});
+                    const wrapper = document.createElement("div");
+                    wrapper.innerHTML = "<strong>Planned Tool Calls</strong>";
+                    wrapper.appendChild(list);
+                    entry.appendChild(wrapper);
+                }}
+            }} else if (event.type === "tool_call") {{
+                entry.appendChild(createTextParagraph("Tool: " + (payload.tool ?? "unknown")));
+                if (payload.call_id) {{
+                    entry.appendChild(createTag("call id: " + payload.call_id));
+                }}
+                entry.appendChild(createCodeBlock(payload.arguments));
+            }} else if (event.type === "tool_result") {{
+                entry.appendChild(createTextParagraph("Tool: " + (payload.tool ?? "unknown")));
+                entry.appendChild(createCodeBlock(payload.result));
+            }} else if (event.type === "tool_error") {{
+                entry.appendChild(createTextParagraph("Tool: " + (payload.tool ?? "unknown")));
+                const errorTag = document.createElement("span");
+                errorTag.className = "tag";
+                errorTag.textContent = "Error";
+                entry.appendChild(errorTag);
+                entry.appendChild(createTextParagraph(payload.error ?? ""));
+            }} else if (event.type === "final_response") {{
+                entry.appendChild(createSection("Assistant Reply", payload.content ?? ""));
+            }}
+
+            timelineContainer.appendChild(entry);
+        }};
+
+        const createTextParagraph = (text) => {{
+            const p = document.createElement("p");
+            p.textContent = text;
+            return p;
+        }};
+
+        const createSection = (title, text) => {{
+            const wrapper = document.createElement("div");
+            const heading = document.createElement("strong");
+            heading.textContent = title;
+            wrapper.appendChild(heading);
+            const body = document.createElement("p");
+            body.textContent = text;
+            wrapper.appendChild(body);
+            return wrapper;
+        }};
+
+        const createReasoning = (text) => {{
+            const block = document.createElement("div");
+            block.className = "reasoning";
+            const title = document.createElement("strong");
+            title.textContent = "Model Reasoning";
+            block.appendChild(title);
+            const body = document.createElement("p");
+            body.textContent = text;
+            block.appendChild(body);
+            return block;
+        }};
+
+        const createTag = (label) => {{
+            const span = document.createElement("span");
+            span.className = "tag";
+            span.textContent = label;
+            return span;
+        }};
+
+        const createCodeBlock = (value) => {{
+            const pre = document.createElement("pre");
+            pre.textContent = formatJSON(value);
+            return pre;
+        }};
+
+        data.events.forEach(renderTimelineEntry);
 
         const spanBody = document.getElementById("span-table-body");
         data.spans.forEach((span) => {{
@@ -173,7 +395,7 @@ class TelemetryManager:
         data.events.forEach((event) => {{
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td><span class="badge">${{event.timestamp}}</span></td>
+                <td>${{event.timestamp}}</td>
                 <td>${{event.type}}</td>
                 <td><pre>${{formatJSON(event.payload)}}</pre></td>
             `;
