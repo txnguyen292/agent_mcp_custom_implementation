@@ -29,6 +29,8 @@ class LLMResponse:
 
     content: Optional[str]
     tool_calls: List[LLMToolCall] = field(default_factory=list)
+    reasoning: Optional[str] = None
+    answer: Optional[str] = None
     raw: Any = None
 
     @property
@@ -125,7 +127,13 @@ class OpenAIClient:
             )
             for call in response.get("tool_calls", [])
         ]
-        return LLMResponse(content=content, tool_calls=tool_calls, raw=response)
+        return LLMResponse(
+            content=content,
+            tool_calls=tool_calls,
+            reasoning=response.get("reasoning"),
+            answer=response.get("answer"),
+            raw=response,
+        )
 
     def _parse_chat_response(self, response: Any) -> LLMResponse:
         choice = getattr(response, "choices", None)
@@ -133,7 +141,7 @@ class OpenAIClient:
             raise LLMResponseError("OpenAI response did not include choices.")
 
         message = choice[0].message
-        content = message.content
+        content, reasoning, answer = self._extract_message_content_and_reasoning(message)
         tool_calls_payload = getattr(message, "tool_calls", None) or []
 
         tool_calls: List[LLMToolCall] = []
@@ -154,7 +162,13 @@ class OpenAIClient:
                 LLMToolCall(name=name, arguments=parsed_arguments, call_id=call_id)
             )
 
-        return LLMResponse(content=content, tool_calls=tool_calls, raw=response)
+        return LLMResponse(
+            content=content,
+            tool_calls=tool_calls,
+            reasoning=reasoning,
+            answer=answer,
+            raw=response,
+        )
 
     def _attempt_instrumentation(self) -> Optional[str]:
         """
@@ -178,3 +192,74 @@ class OpenAIClient:
             except Exception as exc:
                 self._logger.debug(f"Failed to instrument OpenAI with {path}: {exc}")
         return None
+
+    def _extract_message_content_and_reasoning(self, message: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        """
+        Extract textual content and reasoning thoughts from an OpenAI response message.
+        Supports both string and content-part formats.
+        """
+        content = getattr(message, "content", None)
+        reasoning: Optional[str] = None
+
+        if isinstance(content, list):
+            text_parts: List[str] = []
+            reasoning_parts: List[str] = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") == "text":
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        text_parts.append(text)
+                elif part.get("type") == "reasoning":
+                    text = part.get("text")
+                    if isinstance(text, str):
+                        reasoning_parts.append(text)
+            content = "\n".join(text_parts) if text_parts else None
+            reasoning = "\n".join(reasoning_parts) if reasoning_parts else None
+        elif hasattr(content, "text"):
+            # Some SDKs wrap parts in objects with text attribute.
+            try:
+                text = getattr(content, "text")
+                if isinstance(text, list):
+                    text_parts = [t.value for t in text if hasattr(t, "value")]
+                    content = "\n".join(text_parts) if text_parts else None
+                elif isinstance(text, str):
+                    content = text
+            except Exception:  # pragma: no cover
+                pass
+
+        # Some models expose explicit reasoning fields.
+        if reasoning is None:
+            reasoning_candidate = getattr(message, "reasoning", None)
+            if isinstance(reasoning_candidate, str):
+                reasoning = reasoning_candidate
+            elif isinstance(reasoning_candidate, list):
+                reasoning = "\n".join(
+                    item.get("text", "")
+                    for item in reasoning_candidate
+                    if isinstance(item, dict)
+                ).strip() or None
+
+        extracted_answer: Optional[str] = None
+
+        if isinstance(content, str):
+            reason_text = None
+            answer_text = None
+
+            if "Reasoning:" in content:
+                after_reason = content.split("Reasoning:", 1)[1]
+                if "Answer:" in after_reason:
+                    reason_text, after_reason = after_reason.split("Answer:", 1)
+                    answer_text = after_reason.strip()
+                else:
+                    reason_text = after_reason.strip()
+                if reason_text:
+                    reasoning = reasoning or reason_text.strip()
+            if "Answer:" in content:
+                answer_text = content.split("Answer:", 1)[1].strip()
+
+            if answer_text:
+                extracted_answer = answer_text
+
+        return content, reasoning, extracted_answer

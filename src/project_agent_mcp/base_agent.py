@@ -26,12 +26,14 @@ class BaseAgent:
         context_manager: Optional[ContextManager] = None,
         telemetry: Optional[TelemetryManager] = None,
         max_tool_iterations: int = 5,
+        system_message: Optional[str] = None,
     ) -> None:
         self.mcp_client = mcp_client
         self.llm_client = llm_client
         self.context_manager = context_manager or ContextManager()
         self.telemetry = telemetry or TelemetryManager()
         self.max_tool_iterations = max_tool_iterations
+        self.system_message = system_message
         self._logger = logger.bind(component="BaseAgent")
 
     # ------------------------------------------------------------------
@@ -42,6 +44,9 @@ class BaseAgent:
         Entry point for handling a user query end-to-end.
         """
         self.context_manager.reset()
+        if self.system_message:
+            self.context_manager.add_system_message(self.system_message)
+            self.telemetry.record_event("system_message", {"content": self.system_message})
         self.context_manager.add_user_message(user_message)
         self.telemetry.record_event("user_message", {"content": user_message})
         self._logger.info("Processing user message")
@@ -49,6 +54,8 @@ class BaseAgent:
         tool_definitions = self._discover_tools()
         tool_schemas = [tool.to_openai_schema() for tool in tool_definitions]
         final_response: Optional[str] = None
+        final_answer: Optional[str] = None
+        final_reasoning: Optional[str] = None
 
         with self.telemetry.span(
             "agent.process_message",
@@ -76,6 +83,8 @@ class BaseAgent:
 
                 if llm_response.content is not None:
                     final_response = llm_response.content
+                    final_answer = llm_response.answer
+                    final_reasoning = llm_response.reasoning
                     break
 
             if final_response is None:
@@ -83,7 +92,13 @@ class BaseAgent:
                     f"Agent stopped after {self.max_tool_iterations} iterations without a final answer."
                 )
 
-        self.telemetry.record_event("final_response", {"content": final_response})
+        final_payload: Dict[str, Any] = {"content": final_response}
+        if final_answer is not None:
+            final_payload["answer"] = final_answer
+        if final_reasoning is not None:
+            final_payload["reasoning"] = final_reasoning
+
+        self.telemetry.record_event("final_response", final_payload)
         self.telemetry.write_dashboard()
         return final_response
 
@@ -133,6 +148,8 @@ class BaseAgent:
         event_payload = {
             "iteration": iteration,
             "content": response.content,
+            "reasoning": response.reasoning,
+            "answer": response.answer,
             "tool_calls": [
                 {"name": call.name, "arguments": call.arguments, "call_id": call.call_id}
                 for call in response.tool_calls

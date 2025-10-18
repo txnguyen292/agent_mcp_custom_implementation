@@ -1,9 +1,11 @@
 import argparse
+import builtins
 import os
 from pathlib import Path
+from rich import print
+from project_agent_mcp import AgentRunner, build_runner, register_basic_math_tools
 
-from project_agent_mcp import AgentRunner, build_runner, register_add_numbers_tool
-
+builtins.print = print  # Override built-in print with rich print
 
 def build_cli_runner() -> AgentRunner:
     if not os.environ.get("OPENAI_API_KEY"):
@@ -12,7 +14,7 @@ def build_cli_runner() -> AgentRunner:
         )
     return build_runner(
         model="gpt-4o-mini",
-        tool_factories=[register_add_numbers_tool],
+        tool_factories=[register_basic_math_tools],
         dashboard_dir=Path("dashboards") / "cli",
         dashboard_filename="run.html",
     )

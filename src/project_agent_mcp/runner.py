@@ -18,6 +18,13 @@ from .telemetry import TelemetryManager
 
 ToolHandler = Callable[..., Any]
 
+DEFAULT_SYSTEM_MESSAGE = (
+    "You are a careful tool-using assistant. For each task, thoughtfully reason step-by-step "
+    "before producing the final answer. When you respond, include a 'Reasoning:' section that "
+    "explains the key steps you took and an 'Answer:' line containing the final result. Use the "
+    "available tools whenever they can improve accuracy."
+)
+
 
 @dataclass
 class AgentRunner:
@@ -56,6 +63,7 @@ def build_runner(
     dashboard_dir: Path | str = Path("dashboards") / "runner",
     dashboard_filename: str = "index.html",
     mcp_client: Optional[MCPClient] = None,
+    system_message: Optional[str] = DEFAULT_SYSTEM_MESSAGE,
 ) -> AgentRunner:
     """
     Create an AgentRunner configured with the given model and optional tools.
@@ -79,26 +87,55 @@ def build_runner(
         llm_client=OpenAIClient(model=model),
         context_manager=ContextManager(),
         telemetry=telemetry,
+        system_message=system_message,
     )
     return AgentRunner(agent=agent, telemetry=telemetry)
 
 
-def register_add_numbers_tool(mcp_client: MCPClient) -> None:
-    """Register a simple addition tool for demos."""
+def register_basic_math_tools(mcp_client: MCPClient) -> None:
+    """Register basic arithmetic tools (add, subtract, multiply, divide)."""
 
     def add(a: float, b: float) -> float:
         return a + b
 
-    mcp_client.register_tool(
-        name="add_numbers",
-        handler=add,
-        description="Add two numbers together.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "a": {"type": "number"},
-                "b": {"type": "number"},
+    def subtract(a: float, b: float) -> float:
+        return a - b
+
+    def multiply(a: float, b: float) -> float:
+        return a * b
+
+    def divide(a: float, b: float) -> float:
+        if b == 0:
+            raise ValueError("Division by zero is not allowed.")
+        return a / b
+
+    def register(name: str, handler: Callable[..., Any], description: str) -> None:
+        mcp_client.register_tool(
+            name=name,
+            handler=handler,
+            description=description,
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "a": {"type": "number"},
+                    "b": {"type": "number"},
+                },
+                "required": ["a", "b"],
             },
-            "required": ["a", "b"],
-        },
+        )
+
+    register("add_numbers", add, "Add two numbers together.")
+    register("subtract_numbers", subtract, "Subtract the second number from the first.")
+    register("multiply_numbers", multiply, "Multiply two numbers.")
+    register("divide_numbers", divide, "Divide the first number by the second.")
+
+
+def register_add_numbers_tool(mcp_client: MCPClient) -> None:
+    """
+    Backwards compatible helper that now registers the full set of basic math tools.
+    """
+
+    logger.warning(
+        "register_add_numbers_tool is deprecated; use register_basic_math_tools instead."
     )
+    register_basic_math_tools(mcp_client)

@@ -68,6 +68,13 @@ class ContextManager:
             ConversationMessage(role="user", content=content, metadata=metadata or {})
         )
 
+    def add_system_message(
+        self, content: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
+        self._messages.append(
+            ConversationMessage(role="system", content=content, metadata=metadata or {})
+        )
+
     def add_model_message(
         self,
         content: Optional[str],
