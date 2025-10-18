@@ -30,6 +30,7 @@ class LLMResponse:
     content: Optional[str]
     tool_calls: List[LLMToolCall] = field(default_factory=list)
     reasoning: Optional[str] = None
+    answer: Optional[str] = None
     raw: Any = None
 
     @property
@@ -130,6 +131,7 @@ class OpenAIClient:
             content=content,
             tool_calls=tool_calls,
             reasoning=response.get("reasoning"),
+            answer=response.get("answer"),
             raw=response,
         )
 
@@ -139,7 +141,7 @@ class OpenAIClient:
             raise LLMResponseError("OpenAI response did not include choices.")
 
         message = choice[0].message
-        content, reasoning = self._extract_message_content_and_reasoning(message)
+        content, reasoning, answer = self._extract_message_content_and_reasoning(message)
         tool_calls_payload = getattr(message, "tool_calls", None) or []
 
         tool_calls: List[LLMToolCall] = []
@@ -160,7 +162,13 @@ class OpenAIClient:
                 LLMToolCall(name=name, arguments=parsed_arguments, call_id=call_id)
             )
 
-        return LLMResponse(content=content, tool_calls=tool_calls, reasoning=reasoning, raw=response)
+        return LLMResponse(
+            content=content,
+            tool_calls=tool_calls,
+            reasoning=reasoning,
+            answer=answer,
+            raw=response,
+        )
 
     def _attempt_instrumentation(self) -> Optional[str]:
         """
@@ -185,7 +193,7 @@ class OpenAIClient:
                 self._logger.debug(f"Failed to instrument OpenAI with {path}: {exc}")
         return None
 
-    def _extract_message_content_and_reasoning(self, message: Any) -> tuple[Optional[str], Optional[str]]:
+    def _extract_message_content_and_reasoning(self, message: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Extract textual content and reasoning thoughts from an OpenAI response message.
         Supports both string and content-part formats.
@@ -233,4 +241,25 @@ class OpenAIClient:
                     if isinstance(item, dict)
                 ).strip() or None
 
-        return content, reasoning
+        extracted_answer: Optional[str] = None
+
+        if isinstance(content, str):
+            reason_text = None
+            answer_text = None
+
+            if "Reasoning:" in content:
+                after_reason = content.split("Reasoning:", 1)[1]
+                if "Answer:" in after_reason:
+                    reason_text, after_reason = after_reason.split("Answer:", 1)
+                    answer_text = after_reason.strip()
+                else:
+                    reason_text = after_reason.strip()
+                if reason_text:
+                    reasoning = reasoning or reason_text.strip()
+            if "Answer:" in content:
+                answer_text = content.split("Answer:", 1)[1].strip()
+
+            if answer_text:
+                extracted_answer = answer_text
+
+        return content, reasoning, extracted_answer

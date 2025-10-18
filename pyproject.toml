@@ -12,6 +12,7 @@ dependencies = [
     "openai",
     "rich>=14.2.0",
     "traceloop-sdk>=0.47.3",
+    "streamlit>=1.40.0",
 ]
 
 [project.optional-dependencies]

@@ -33,6 +33,17 @@ python main.py
 ```
 Type `exit` to leave the session.
 
+## Telemetry Dashboard (Streamlit)
+After running the agent, telemetry JSON files are written to `dashboards/`.
+Launch the interactive dashboard with Streamlit:
+```bash
+streamlit run src/project_agent_mcp/dashboard_app.py
+```
+or, with uv:
+```bash
+uv run streamlit run src/project_agent_mcp/dashboard_app.py
+```
+
 ## Notebooks
 1. `notebooks/base_agent_demo.ipynb`: Live OpenAI demo showing BaseAgent + MCP tool integration.
 2. `notebooks/context_manager_demo.ipynb`: Explore ContextManager message formatting.

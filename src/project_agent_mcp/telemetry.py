@@ -98,9 +98,15 @@ class TelemetryManager:
             "spans": [span.to_dict() for span in self.spans],
             "generated_at": datetime.utcnow().isoformat(),
         }
+        json_filename = Path(self.dashboard_filename).with_suffix(".json").name
+        json_path = self.dashboard_dir / json_filename
+        json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
         html = self._render_dashboard_html(data)
         dashboard_path.write_text(html, encoding="utf-8")
+
         self._logger.info(f"Dashboard written to {dashboard_path}")
+        self._logger.debug(f"Dashboard JSON written to {json_path}")
         return dashboard_path
 
     # ------------------------------------------------------------------
@@ -267,6 +273,7 @@ class TelemetryManager:
 
         const TIMELINE_TYPES = {{
             user_message: {{ role: "user", title: "User Message" }},
+            system_message: {{ role: "system", title: "System Instruction" }},
             llm_response: {{ role: "assistant", title: "LLM Response" }},
             tool_call: {{ role: "tool", title: "Tool Call" }},
             tool_result: {{ role: "tool", title: "Tool Result" }},
@@ -294,12 +301,17 @@ class TelemetryManager:
 
             if (event.type === "user_message") {{
                 entry.appendChild(createTextParagraph(payload.content ?? ""));
+            }} else if (event.type === "system_message") {{
+                entry.appendChild(createSection("Instruction", payload.content ?? ""));
             }} else if (event.type === "llm_response") {{
-                if (payload.content) {{
-                    entry.appendChild(createSection("Assistant Reply", payload.content));
+                if (payload.answer) {{
+                    entry.appendChild(createSection("Answer", payload.answer));
                 }}
                 if (payload.reasoning) {{
                     entry.appendChild(createReasoning(payload.reasoning));
+                }}
+                if (!payload.answer && payload.content) {{
+                    entry.appendChild(createSection("Assistant Reply", payload.content));
                 }}
                 if (payload.tool_calls && payload.tool_calls.length) {{
                     const list = document.createElement("ul");
@@ -330,7 +342,15 @@ class TelemetryManager:
                 entry.appendChild(errorTag);
                 entry.appendChild(createTextParagraph(payload.error ?? ""));
             }} else if (event.type === "final_response") {{
-                entry.appendChild(createSection("Assistant Reply", payload.content ?? ""));
+                if (payload.answer) {{
+                    entry.appendChild(createSection("Final Answer", payload.answer));
+                }}
+                if (payload.reasoning) {{
+                    entry.appendChild(createReasoning(payload.reasoning));
+                }}
+                if (!payload.answer && payload.content) {{
+                    entry.appendChild(createSection("Assistant Reply", payload.content ?? ""));
+                }}
             }}
 
             timelineContainer.appendChild(entry);

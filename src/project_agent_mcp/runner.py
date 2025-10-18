@@ -18,6 +18,13 @@ from .telemetry import TelemetryManager
 
 ToolHandler = Callable[..., Any]
 
+DEFAULT_SYSTEM_MESSAGE = (
+    "You are a careful tool-using assistant. For each task, thoughtfully reason step-by-step "
+    "before producing the final answer. When you respond, include a 'Reasoning:' section that "
+    "explains the key steps you took and an 'Answer:' line containing the final result. Use the "
+    "available tools whenever they can improve accuracy."
+)
+
 
 @dataclass
 class AgentRunner:
@@ -56,6 +63,7 @@ def build_runner(
     dashboard_dir: Path | str = Path("dashboards") / "runner",
     dashboard_filename: str = "index.html",
     mcp_client: Optional[MCPClient] = None,
+    system_message: Optional[str] = DEFAULT_SYSTEM_MESSAGE,
 ) -> AgentRunner:
     """
     Create an AgentRunner configured with the given model and optional tools.
@@ -79,6 +87,7 @@ def build_runner(
         llm_client=OpenAIClient(model=model),
         context_manager=ContextManager(),
         telemetry=telemetry,
+        system_message=system_message,
     )
     return AgentRunner(agent=agent, telemetry=telemetry)
 
