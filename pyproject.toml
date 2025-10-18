@@ -10,6 +10,7 @@ dependencies = [
     "mcp",
     "notebook>=7.4.7",
     "openai",
+    "rich>=14.2.0",
     "traceloop-sdk>=0.47.3",
 ]
 
